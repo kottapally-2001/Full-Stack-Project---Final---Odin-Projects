@@ -16,10 +16,12 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // inline editing
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [roleValue, setRoleValue] = useState<"admin" | "user">("user");
+
   useEffect(() => {
     const token = localStorage.getItem("token");
-
-    // 🔐 No token → redirect to login
     if (!token) {
       navigate("/login");
       return;
@@ -31,15 +33,16 @@ const Users = () => {
       },
     })
       .then((res) => {
-        if (res.status === 401) throw new Error("Not authenticated");
-        if (res.status === 403) throw new Error("Admins only");
         if (!res.ok) throw new Error("Failed to fetch users");
         return res.json();
       })
       .then((data: User[]) => {
-        // ✅ SORT USERS BY ID (ASCENDING)
-        const sortedUsers = [...data].sort((a, b) => a.id - b.id);
-        setUsers(sortedUsers);
+        const sorted = [...data].sort((a, b) => {
+          if (a.role === "admin" && b.role !== "admin") return -1;
+          if (a.role !== "admin" && b.role === "admin") return 1;
+          return a.id - b.id;
+        });
+        setUsers(sorted);
         setLoading(false);
       })
       .catch((err) => {
@@ -48,39 +51,98 @@ const Users = () => {
       });
   }, [navigate]);
 
-  if (loading) {
-    return <p className="users-loading">Loading users...</p>;
-  }
+  const saveRole = async (userId: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
-  if (error) {
-    return <p className="users-error">{error}</p>;
-  }
+    await fetch(`${API_URL}/users/${userId}/role`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ role: roleValue }),
+    });
+
+    setUsers((prev) =>
+      [...prev]
+        .map((u) =>
+          u.id === userId ? { ...u, role: roleValue } : u
+        )
+        .sort((a, b) => {
+          if (a.role === "admin" && b.role !== "admin") return -1;
+          if (a.role !== "admin" && b.role === "admin") return 1;
+          return a.id - b.id;
+        })
+    );
+
+    setEditingUserId(null);
+  };
+
+  if (loading) return <p className="users-loading">Loading users...</p>;
+  if (error) return <p className="users-error">{error}</p>;
 
   return (
     <div className="users-page">
       <button className="back-btn" onClick={() => navigate(-1)}>
         ← Back
       </button>
+
       <h2 className="users-title">Users</h2>
 
       <table className="users-table">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>S.No</th>
             <th>Username</th>
             <th>Role</th>
           </tr>
         </thead>
 
         <tbody>
-          {users.map((user) => (
+          {users.map((user, index) => (
             <tr key={user.id}>
-              <td>{user.id}</td>
+              <td>{index + 1}</td>
               <td>{user.username}</td>
-              <td>
-                <span className={`role-badge ${user.role}`}>
-                  {user.role}
-                </span>
+
+              <td className="role-cell">
+                {editingUserId === user.id ? (
+                  <>
+                    <select
+                      value={roleValue}
+                      onChange={(e) =>
+                        setRoleValue(e.target.value as "admin" | "user")
+                      }
+                      className="role-select"
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+
+                    <button
+                      className="nav-btn"
+                      onClick={() => saveRole(user.id)}
+                    >
+                      Save
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className={`role-badge ${user.role}`}>
+                      {user.role}
+                    </span>
+
+                    <button
+                      className="nav-btn"
+                      onClick={() => {
+                        setEditingUserId(user.id);
+                        setRoleValue(user.role);
+                      }}
+                    >
+                      Edit
+                    </button>
+                  </>
+                )}
               </td>
             </tr>
           ))}
