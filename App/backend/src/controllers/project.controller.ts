@@ -1,39 +1,90 @@
 import { Response } from "express";
 import { AuthRequest } from "../types/auth";
-import { projects } from "../projects";
+import { prisma } from "../config/prisma";
 
-export const getProjects = (req: AuthRequest, res: Response) => {
+/* =========================
+   GET ALL PROJECTS
+========================= */
+export const getProjects = async (req: AuthRequest, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-  //BLOCK unauthenticated users
-  if (!req.user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+  const projects =
+    req.user.role === "admin"
+      ? await prisma.project.findMany()
+      : await prisma.project.findMany({
+          where: { restricted: false },
+        });
 
-  // Admin → all projects
-  if (req.user.role === "admin") {
-    return res.json(projects);
-  }
-
-  // User → only non-restricted projects
-  return res.json(projects.filter(p => !p.restricted));
+  res.json(projects);
 };
 
-
-// GET single project by ID
-
-export const getProjectById = (req: AuthRequest, res: Response) => {
+/* =========================
+   GET PROJECT BY ID
+========================= */
+export const getProjectById = async (req: AuthRequest, res: Response) => {
   const projectId = Number(req.params.id);
 
-  const project = projects.find(p => p.id === projectId);
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
 
   if (!project) {
     return res.status(404).json({ message: "Project not found" });
   }
 
-  // protect restricted projects
   if (project.restricted && req.user?.role !== "admin") {
     return res.status(403).json({ message: "Access denied" });
   }
 
-  return res.json(project);
+  res.json(project);
+};
+
+/* =========================
+   CREATE PROJECT (ADMIN)
+========================= */
+export const createProject = async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Admins only" });
+  }
+
+  const project = await prisma.project.create({
+    data: req.body,
+  });
+
+  res.json(project);
+};
+
+/* =========================
+   UPDATE PROJECT (ADMIN)
+========================= */
+export const updateProject = async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Admins only" });
+  }
+
+  const projectId = Number(req.params.id);
+
+  const project = await prisma.project.update({
+    where: { id: projectId },
+    data: req.body,
+  });
+
+  res.json(project);
+};
+
+/* =========================
+   DELETE PROJECT (ADMIN)
+========================= */
+export const deleteProject = async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Admins only" });
+  }
+
+  const projectId = Number(req.params.id);
+
+  await prisma.project.delete({
+    where: { id: projectId },
+  });
+
+  res.json({ message: "Project deleted" });
 };

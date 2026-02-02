@@ -4,14 +4,14 @@ import { authMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 
-// GET users
+// GET ALL USERS
 router.get(
   "/",
   authMiddleware as RequestHandler,
   getUsers as RequestHandler
 );
 
-// ✅ UPDATE user role
+// UPDATE USER ROLE
 router.put(
   "/:id/role",
   authMiddleware as RequestHandler,

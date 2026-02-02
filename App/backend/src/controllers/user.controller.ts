@@ -20,13 +20,13 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
   res.json(users);
 };
 
-// ✅ ADD THIS (ROLE UPDATE)
+// UPDATE USER ROLE
 export const updateUserRole = async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // 🔐 ADMIN ONLY
+  // ADMIN ONLY
   if (req.user.role !== "admin") {
     return res.status(403).json({ message: "Admins only" });
   }
@@ -38,7 +38,7 @@ export const updateUserRole = async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ message: "Invalid role" });
   }
 
-  // ❗ Prevent admin changing own role
+  // PREVENT SELF-ROLE CHANGE
   if (req.user.id === userId) {
     return res.status(400).json({ message: "Cannot change your own role" });
   }

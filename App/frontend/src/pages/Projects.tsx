@@ -11,10 +11,9 @@ const Projects = () => {
   const [error, setError] = useState("");
 
   const role = localStorage.getItem("role");
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
     if (!token) {
       navigate("/login");
       return;
@@ -29,7 +28,7 @@ const Projects = () => {
       })
       .then(setProjects)
       .catch(() => setError("Failed to load projects"));
-  }, [navigate]);
+  }, [navigate, token]);
 
   return (
     <main className="projects">
@@ -47,8 +46,15 @@ const Projects = () => {
             <h3>{p.title}</h3>
             <p>{p.description}</p>
 
-            {p.restricted && role !== "admin" && (
-              <span className="badge">Admin only</span>
+            {/* STATUS ONLY */}
+            {role === "admin" && (
+              <span
+                className={
+                  p.restricted ? "admin-badge" : "public-badge"
+                }
+              >
+                {p.restricted ? "Admin only" : "Public"}
+              </span>
             )}
           </div>
         ))}

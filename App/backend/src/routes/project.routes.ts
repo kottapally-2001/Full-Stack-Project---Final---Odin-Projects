@@ -2,23 +2,22 @@ import { Router, RequestHandler } from "express";
 import {
   getProjects,
   getProjectById,
+  createProject,
+  updateProject,
+  deleteProject,
 } from "../controllers/project.controller";
+
 import { authMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 
-//GET all projects
-router.get(
-  "/",
-  authMiddleware as unknown as RequestHandler,
-  getProjects as unknown as RequestHandler
-);
+router.get("/", authMiddleware as RequestHandler, getProjects as RequestHandler);
+router.get("/:id", authMiddleware as RequestHandler, getProjectById as RequestHandler);
 
-//GET project by ID
-router.get(
-  "/:id",
-  authMiddleware as unknown as RequestHandler,
-  getProjectById as unknown as RequestHandler
-);
+// CREATE, UPDATE, DELETE PROJECTS
+router.post("/", authMiddleware as RequestHandler, createProject as RequestHandler);
+router.put("/:id", authMiddleware as RequestHandler, updateProject as RequestHandler);
+router.delete("/:id", authMiddleware as RequestHandler, deleteProject as RequestHandler);
 
 export default router;
+

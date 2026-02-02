@@ -6,6 +6,7 @@ import Projects from "./pages/Projects";
 import Users from "./pages/Users";
 import ProjectDetails from "./pages/ProjectDetails";
 import "./App.css";
+import AddProject from "./pages/AddProject";
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const token = localStorage.getItem("token");
@@ -40,6 +41,13 @@ const App = () => {
             <button className="nav-btn" onClick={() => navigate("/projects")}>
               Projects
             </button>
+
+          {role === "admin" && (
+            <button className="nav-btn" onClick={() => navigate("/projects/new")}>
+               + Add Project
+             </button>
+            )}
+
 
             {role === "admin" && (
               <button className="nav-btn" onClick={() => navigate("/users")}>
@@ -76,8 +84,6 @@ const App = () => {
       </ProtectedRoute>
     }
   />
-
-  {/* ✅ THIS WAS MISSING */}
   <Route
     path="/projects/:id"
     element={
@@ -99,6 +105,20 @@ const App = () => {
       )
     }
   />
+
+  <Route
+  path="/projects/new"
+  element={
+    role === "admin" ? (
+      <ProtectedRoute>
+        <AddProject />
+      </ProtectedRoute>
+    ) : (
+      <Navigate to="/projects" replace />
+    )
+  }
+/>
+
 
   <Route path="*" element={<Navigate to="/" replace />} />
 </Routes>
