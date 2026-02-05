@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { RegisterDTO, RegisterSchema } from "../dtos/auth.dto";
 
 const API_URL = "http://localhost:4000";
 
 const UserRegister = () => {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<RegisterDTO>({
     username: "",
     password: "",
     role: "user",
@@ -15,11 +16,20 @@ const UserRegister = () => {
   const [error, setError] = useState("");
 
   const register = async () => {
+    const parsed = RegisterSchema.safeParse(form);
+
+    if (!parsed.success) {
+      setError(
+        Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] || ""
+      );
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(parsed.data),
       });
 
       const data = await res.json();
@@ -56,10 +66,9 @@ const UserRegister = () => {
       />
 
       <select
-        aria-label="Role"
         value={form.role}
         onChange={(e) =>
-          setForm({ ...form, role: e.target.value as "user" | "admin" })
+          setForm({ ...form, role: e.target.value as "admin" | "user" })
         }
       >
         <option value="user">User</option>
@@ -72,6 +81,7 @@ const UserRegister = () => {
         Register
       </button>
 
+      {/* ✅ LOGIN LINK (THIS WAS MISSING) */}
       <p className="auth-footer">
         Already have an account?{" "}
         <span

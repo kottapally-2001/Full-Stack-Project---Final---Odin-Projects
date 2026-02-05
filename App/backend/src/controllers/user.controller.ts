@@ -2,6 +2,7 @@ import { Response } from "express";
 import { prisma } from "../config/prisma";
 import { AuthRequest } from "../types/auth";
 
+/* ================= GET USERS ================= */
 export const getUsers = async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -20,13 +21,12 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
   res.json(users);
 };
 
-// UPDATE USER ROLE
+/* ================= UPDATE USER ROLE ================= */
 export const updateUserRole = async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // ADMIN ONLY
   if (req.user.role !== "admin") {
     return res.status(403).json({ message: "Admins only" });
   }
@@ -38,7 +38,7 @@ export const updateUserRole = async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ message: "Invalid role" });
   }
 
-  // PREVENT SELF-ROLE CHANGE
+  // Prevent self role change
   if (req.user.id === userId) {
     return res.status(400).json({ message: "Cannot change your own role" });
   }
@@ -53,5 +53,29 @@ export const updateUserRole = async (req: AuthRequest, res: Response) => {
     },
   });
 
-  return res.json(updatedUser);
+  res.json(updatedUser);
+};
+
+/* ================= DELETE USER ================= */
+export const deleteUser = async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Admins only" });
+  }
+
+  const userId = Number(req.params.id);
+
+  // Prevent self delete
+  if (req.user.id === userId) {
+    return res.status(400).json({ message: "You cannot delete yourself" });
+  }
+
+  await prisma.user.delete({
+    where: { id: userId },
+  });
+
+  res.json({ message: "User deleted successfully" });
 };

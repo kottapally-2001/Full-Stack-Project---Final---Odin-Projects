@@ -16,9 +16,10 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // inline editing
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [roleValue, setRoleValue] = useState<"admin" | "user">("user");
+
+  const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -28,9 +29,7 @@ const Users = () => {
     }
 
     fetch(`${API_URL}/users`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch users");
@@ -79,6 +78,21 @@ const Users = () => {
     setEditingUserId(null);
   };
 
+  const deleteUser = async () => {
+    if (!deleteUserId) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    await fetch(`${API_URL}/users/${deleteUserId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    setUsers((prev) => prev.filter((u) => u.id !== deleteUserId));
+    setDeleteUserId(null);
+  };
+
   if (loading) return <p className="users-loading">Loading users...</p>;
   if (error) return <p className="users-error">{error}</p>;
 
@@ -113,7 +127,6 @@ const Users = () => {
                       onChange={(e) =>
                         setRoleValue(e.target.value as "admin" | "user")
                       }
-                      className="role-select"
                     >
                       <option value="user">User</option>
                       <option value="admin">Admin</option>
@@ -141,6 +154,13 @@ const Users = () => {
                     >
                       Edit
                     </button>
+
+                    <button
+                      className="admin-delete-btn"
+                      onClick={() => setDeleteUserId(user.id)}
+                    >
+                      Delete
+                    </button>
                   </>
                 )}
               </td>
@@ -148,6 +168,33 @@ const Users = () => {
           ))}
         </tbody>
       </table>
+
+      {/* DELETE CONFIRMATION POPUP */}
+      {deleteUserId && (
+        <div className="restrict-overlay">
+          <div className="restrict-popup">
+            <h4>Delete user?</h4>
+
+            <p className="delete-warning">
+              This action cannot be undone.
+            </p>
+
+            <button
+              className="delete-confirm-btn"
+              onClick={deleteUser}
+            >
+              Yes, Delete
+            </button>
+
+            <button
+              className="restrict-cancel"
+              onClick={() => setDeleteUserId(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

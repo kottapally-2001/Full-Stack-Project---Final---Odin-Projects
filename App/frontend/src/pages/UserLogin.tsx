@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { LoginDTO, LoginSchema, LoginResponseDTO } from "../dtos/auth.dto";
 
 const API_URL = "http://localhost:4000";
 
 const UserLogin = () => {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<LoginDTO>({
     username: "",
     password: "",
   });
@@ -14,14 +15,23 @@ const UserLogin = () => {
   const [error, setError] = useState("");
 
   const login = async () => {
+    const parsed = LoginSchema.safeParse(form);
+
+    if (!parsed.success) {
+      setError(
+        Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] || ""
+      );
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(parsed.data),
       });
 
-      const data = await res.json();
+      const data: LoginResponseDTO = await res.json();
 
       if (data.token) {
         localStorage.setItem("token", data.token);
@@ -29,7 +39,7 @@ const UserLogin = () => {
         localStorage.setItem("username", form.username);
         navigate("/dashboard");
       } else {
-        setError(data.message || "Login failed");
+        setError("Invalid credentials");
       }
     } catch {
       setError("Something went wrong");
@@ -59,10 +69,12 @@ const UserLogin = () => {
 
       {error && <p className="error">{error}</p>}
 
+      {/* ✅ BUTTON MUST USE .primary */}
       <button className="primary" onClick={login}>
         Login
       </button>
 
+      {/* ✅ REGISTER LINK (THIS WAS MISSING) */}
       <p className="auth-footer">
         New user?{" "}
         <span
