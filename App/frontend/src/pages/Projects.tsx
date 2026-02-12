@@ -30,6 +30,10 @@ const Projects = () => {
       .catch(() => setError("Failed to load projects"));
   }, [navigate, token]);
 
+  const orderedProjects = [...projects].sort((a, b) =>
+    a.title.localeCompare(b.title)
+  );
+
   return (
     <main className="projects">
       <h2>Projects</h2>
@@ -37,7 +41,7 @@ const Projects = () => {
       {error && <p className="error">{error}</p>}
 
       <div className="projects-list">
-        {projects.map((p) => (
+        {orderedProjects.map((p) => (
           <div
             key={p.id}
             className="project-card"
@@ -46,12 +50,9 @@ const Projects = () => {
             <h3>{p.title}</h3>
             <p>{p.description}</p>
 
-            {/* STATUS ONLY */}
             {role === "admin" && (
               <span
-                className={
-                  p.restricted ? "admin-badge" : "public-badge"
-                }
+                className={p.restricted ? "admin-badge" : "public-badge"}
               >
                 {p.restricted ? "Admin only" : "Public"}
               </span>

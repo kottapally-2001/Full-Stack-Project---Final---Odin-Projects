@@ -169,7 +169,6 @@ const Users = () => {
         </tbody>
       </table>
 
-      {/* DELETE CONFIRMATION POPUP */}
       {deleteUserId && (
         <div className="restrict-overlay">
           <div className="restrict-popup">

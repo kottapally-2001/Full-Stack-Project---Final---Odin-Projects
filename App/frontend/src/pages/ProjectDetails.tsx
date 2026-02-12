@@ -183,7 +183,7 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        {/* PREVIEW (UNCHANGED) */}
+        {/* PREVIEW */}
         {project.previewUrl && (
           <div className="project-preview center-preview">
             <iframe

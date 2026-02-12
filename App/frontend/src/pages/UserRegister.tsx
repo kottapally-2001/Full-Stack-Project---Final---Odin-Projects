@@ -80,8 +80,7 @@ const UserRegister = () => {
       <button className="primary" onClick={register}>
         Register
       </button>
-
-      {/* ✅ LOGIN LINK (THIS WAS MISSING) */}
+      
       <p className="auth-footer">
         Already have an account?{" "}
         <span

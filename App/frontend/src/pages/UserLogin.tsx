@@ -14,7 +14,9 @@ const UserLogin = () => {
 
   const [error, setError] = useState("");
 
-  const login = async () => {
+  const login = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault(); 
+
     const parsed = LoginSchema.safeParse(form);
 
     if (!parsed.success) {
@@ -50,31 +52,32 @@ const UserLogin = () => {
     <div className="auth-page">
       <h2>Login</h2>
 
-      <input
-        placeholder="Username"
-        value={form.username}
-        onChange={(e) =>
-          setForm({ ...form, username: e.target.value })
-        }
-      />
+      {/* 🔥 FORM WRAPPER */}
+      <form onSubmit={login}>
+        <input
+          placeholder="Username"
+          value={form.username}
+          onChange={(e) =>
+            setForm({ ...form, username: e.target.value })
+          }
+        />
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={form.password}
-        onChange={(e) =>
-          setForm({ ...form, password: e.target.value })
-        }
-      />
+        <input
+          type="password"
+          placeholder="Password"
+          value={form.password}
+          onChange={(e) =>
+            setForm({ ...form, password: e.target.value })
+          }
+        />
 
-      {error && <p className="error">{error}</p>}
+        {error && <p className="error">{error}</p>}
 
-      {/* ✅ BUTTON MUST USE .primary */}
-      <button className="primary" onClick={login}>
-        Login
-      </button>
+        <button className="primary" type="submit">
+          Login
+        </button>
+      </form>
 
-      {/* ✅ REGISTER LINK (THIS WAS MISSING) */}
       <p className="auth-footer">
         New user?{" "}
         <span
