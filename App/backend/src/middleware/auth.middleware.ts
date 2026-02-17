@@ -22,6 +22,7 @@ return res.status(401).json({ message: "Unauthorized" });
 
 try {
 const decoded = jwt.verify(token, JWT_SECRET) as {
+username: string;
 id: number;
 role: "admin" | "user";
 };

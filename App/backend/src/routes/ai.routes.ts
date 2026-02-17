@@ -10,13 +10,13 @@ const router = Router();
 router.post(
   "/chat",
   authMiddleware as RequestHandler,
-  chatWithAI as RequestHandler
+  chatWithAI as unknown as RequestHandler
 );
 
 router.get(
   "/welcome",
   authMiddleware as RequestHandler,
-  getWelcomeMessage as RequestHandler
+  getWelcomeMessage as unknown as RequestHandler
 );
 
 export default router;
