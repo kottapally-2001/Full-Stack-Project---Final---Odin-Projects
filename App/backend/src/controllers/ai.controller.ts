@@ -1,266 +1,270 @@
 import { Response } from "express";
 import { AuthRequest } from "../types/auth";
 import { prisma } from "../config/prisma";
+import fs from "fs";
+const pdfParse = require("pdf-parse");
+import ffmpeg from "fluent-ffmpeg";
+import whisper from "openai-whisper";
 
 const OLLAMA_URL = "http://localhost:11434/api/generate";
-const MODEL_NAME = "phi3:latest";
+const TEXT_MODEL = "phi3";
+const VISION_MODEL = "llava";
 
-// CHAT WITH AI
+// TEXT CHUNK 
+const chunkText = (text: string, size = 3500) => {
+const chunks = [];
+for (let i = 0; i < text.length; i += size) {
+chunks.push(text.slice(i, i + size));
+}
+return chunks;
+};
 
+// CHAT 
 export const chatWithAI = async (req: AuthRequest, res: Response) => {
 try {
-if (!req.user) {
-  return res.status(401).json({ message: "Unauthorized" });
-}
+if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-const { message } = req.body;
-if (!message || typeof message !== "string") {
-  return res.status(400).json({ message: "Message is required" });
-}
-
+const message = req.body.message || "";
 const msg = message.toLowerCase().trim();
 
-// CREATE PROJECT
+let fileText = "";
+const file: any = req.file;
 
+// FILE HANDLING
+if (file) {
+  console.log("📂 File received:", file.originalname);
+
+  // PDF
+  if (file.mimetype === "application/pdf") {
+    const buffer = fs.readFileSync(file.path);
+    const data = await pdfParse(buffer);
+
+    const chunks = chunkText(data.text || "");
+    fileText = chunks.slice(0, 2).join("\n"); // fast analysis
+  }
+
+  // IMAGE (VISION AI)
+  else if (file.mimetype.startsWith("image")) {
+    const imageBase64 = fs.readFileSync(file.path, { encoding: "base64" });
+
+    const visionRes = await fetch(OLLAMA_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        prompt:
+          "Deeply analyze this image. Detect objects, people, text, issues and explain clearly.",
+        images: [imageBase64],
+        stream: false,
+        keep_alive: 0,
+      }),
+    });
+
+    const visionData = await visionRes.json();
+    return res.json({ reply: visionData.response || "Image analyzed" });
+  }
+
+  // AUDIO
+  else if (file.mimetype.startsWith("audio")) {
+    const result: any = await whisper.transcribe(file.path);
+    fileText = result.text;
+  }
+
+  // VIDEO 
+  else if (file.mimetype.startsWith("video")) {
+    const audioPath = file.path + ".mp3";
+
+    await new Promise((resolve) => {
+      ffmpeg(file.path).output(audioPath).on("end", resolve).run();
+    });
+
+    const result: any = await whisper.transcribe(audioPath);
+    fileText = result.text;
+  }
+}
+
+// CREATE PROJECT 
 if (msg.startsWith("create project")) {
   const title = message.replace(/create project/i, "").trim();
-
-  if (!title) {
-    return res.json({ reply: "Tell project name to create." });
-  }
+  if (!title) return res.json({ reply: "Tell project name." });
 
   const newProject = await prisma.project.create({
     data: {
       title,
-      description: "Created by AI assistant",
+      description: "Created by AI",
       gitUrl: "",
       previewUrl: "",
       restricted: false,
     },
   });
 
-  return res.json({
-    reply: `✅ Project "${newProject.title}" created successfully`,
-  });
+  return res.json({ reply: `✅ Project "${newProject.title}" created` });
 }
 
 // DELETE PROJECT 
-
 if (msg.startsWith("delete project")) {
   const title = message.replace(/delete project/i, "").trim();
+  if (!title) return res.json({ reply: "Tell project name to delete." });
 
-  const project = await prisma.project.findFirst({
+  const deleted = await prisma.project.deleteMany({
     where: { title: { contains: title, mode: "insensitive" } },
   });
 
-  if (!project) {
+  if (deleted.count === 0)
     return res.json({ reply: "Project not found." });
-  }
 
-  await prisma.project.delete({
-    where: { id: project.id },
-  });
-
-  return res.json({
-    reply: `🗑️ Project "${project.title}" deleted`,
-  });
-}
-
-// ADD USER
-
-if (msg.startsWith("create user") || msg.startsWith("add user")) {
-  if (req.user.role !== "admin") {
-    return res.json({ reply: "Only admin can create users 👮" });
-  }
-
-  let clean = message
-    .replace(/create user/i, "")
-    .replace(/add user/i, "")
-    .trim();
-
-  const parts = clean.split(" ");
-
-  if (parts.length < 2) {
-    return res.json({
-      reply:
-        "Tell username and role.\nExample: sai user  OR  ram admin",
-    });
-  }
-
-  const username = parts[0];
-  const role = parts[1]?.toLowerCase() === "admin" ? "admin" : "user";
-
-  const existing = await prisma.user.findUnique({
-    where: { username },
-  });
-
-  if (existing) {
-    return res.json({ reply: "User already exists." });
-  }
-
-  const newUser = await prisma.user.create({
-    data: {
-      username,
-      password: "12345678",
-      role,
-    },
-  });
-
-  return res.json({
-    reply: `👤 User "${newUser.username}" created (${newUser.role})\nPassword: 123456`,
-  });
-}
-
-// SHOW USERS 
-
-if (msg.includes("users")) {
-  if (req.user.role !== "admin") {
-    return res.json({ reply: "Only admin can view users 👮" });
-  }
-
-  const users = await prisma.user.findMany({
-    select: { username: true, role: true },
-  });
-
-  if (users.length === 0) {
-    return res.json({ reply: "No users found." });
-  }
-
-  let text = `👥 Users List:\n\n`;
-  users.forEach((u, i) => {
-    text += `${i + 1}. ${u.username} (${u.role})\n`;
-  });
-
-  return res.json({ reply: text });
+  return res.json({ reply: `🗑 Project "${title}" deleted.` });
 }
 
 // DELETE USER 
+if (msg.startsWith("delete user")) {
+  if (req.user.role !== "admin")
+    return res.json({ reply: "Only admin can delete users." });
 
-if (msg.startsWith("delete user") || msg.startsWith("remove user")) {
-  if (req.user.role !== "admin") {
-    return res.json({ reply: "Only admin can delete users 👮" });
-  }
+  const username = message.replace(/delete user/i, "").trim();
+  if (!username) return res.json({ reply: "Tell username." });
 
-  const username = message
-    .replace(/delete user/i, "")
-    .replace(/remove user/i, "")
-    .trim();
-
-  if (!username) {
-    return res.json({
-      reply: "Tell username to delete.\nExample: delete user ram",
-    });
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { username },
+  const deleted = await prisma.user.deleteMany({
+    where: { username: { contains: username, mode: "insensitive" } },
   });
 
-  if (!user) {
+  if (deleted.count === 0)
     return res.json({ reply: "User not found." });
-  }
 
-  if (user.username === req.user.username) {
-    return res.json({
-      reply: "You cannot delete yourself 😅",
-    });
-  }
-
-  await prisma.user.delete({
-    where: { username },
-  });
-
-  return res.json({
-    reply: `🗑️ User "${username}" deleted successfully`,
-  });
+  return res.json({ reply: `👤 User "${username}" deleted.` });
 }
 
 // ANALYTICS 
-
-if (msg.includes("analytics") || msg.includes("stats")) {
+if (msg.includes("analytics")) {
   const totalProjects = await prisma.project.count();
   const totalUsers = await prisma.user.count();
 
   return res.json({
-    reply: `📊 Dashboard Analytics:
-👨‍💻 Users: ${totalUsers}
-📁 Projects: ${totalProjects}
-🚀 System running smoothly`,
+    reply: `📊 System Analytics
+
+• Total Users: ${totalUsers}
+• Total Projects: ${totalProjects}
+• Status: Running perfectly 🚀`,
   });
 }
-// ADMIN INFO 
 
-if (msg.includes("admin")) {
-  const admins = await prisma.user.findMany({
-    where: { role: "admin" },
-    select: { username: true },
+// SHOW PROJECTS 
+if (msg.includes("show projects") || msg === "4") {
+  const projects = await prisma.project.findMany({
+    orderBy: { createdAt: "desc" }, // optional
   });
 
-  const adminList = admins.map(a => a.username).join(", ");
-  return res.json({ reply: `👑 Admins: ${adminList}` });
-}
+  if (!projects.length) {
+    return res.json({ reply: "No projects found." });
+  }
 
-// FETCH CONTEXT
+  let reply = "📁 Projects List:\n\n";
 
-const [projects, users] = await Promise.all([
-  req.user.role === "admin"
-    ? prisma.project.findMany({
-        select: { title: true, description: true },
-      })
-    : prisma.project.findMany({
-        where: { restricted: false },
-        select: { title: true, description: true },
-      }),
-
-  req.user.role === "admin"
-    ? prisma.user.findMany({
-        select: { username: true, role: true },
-      })
-    : Promise.resolve([]),
-]);
-
-let context = `PROJECTS:\n`;
-
-if (projects.length === 0) {
-  context += "No projects available.\n";
-} else {
   projects.forEach((p, i) => {
-    context += `${i + 1}. ${p.title} - ${p.description}\n`;
+    reply += `${i + 1}. ${p.title} - ${p.description || "No description"}\n`;
   });
+
+  return res.json({ reply });
 }
 
-if (req.user.role === "admin") {
-  context += `\nUSERS:\n`;
-  users.forEach((u: any, i: number) => {
-    context += `${i + 1}. ${u.username} (${u.role})\n`;
+
+
+// SHOW USERS 
+if (msg.includes("show users") || msg === "5") {
+  const users = await prisma.user.findMany({
+    select: { username: true, role: true },
   });
+
+  if (!users.length) {
+    return res.json({ reply: "No users found" });
+  }
+
+  let reply = "👥 Users List:\n\n";
+  users.forEach((u, i) => {
+    reply += `${i + 1}. ${u.username} (${u.role})\n`;
+  });
+
+  return res.json({ reply });
 }
 
-// OLLAMA CALL 
 
-const ollamaResponse = await fetch(OLLAMA_URL, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    model: MODEL_NAME,
-    prompt: `
-You are an AI assistant inside a project management dashboard.
-Answer only about projects and users.
-Keep answers short.
+
+// PROJECT CONTEXT 
+const projects = await prisma.project.findMany({
+  select: { title: true, description: true },
+  take: 10,
+});
+
+let context = "PROJECT DATABASE:\n";
+projects.forEach((p, i) => {
+  context += `${i + 1}. ${p.title} - ${p.description}\n`;
+});
+
+// USERS CONTEXT
+const users = await prisma.user.findMany({
+  select: { username: true, role: true },
+  take: 10,
+});
+
+let usersContext = "USERS DATABASE:\n";
+users.forEach((u, i) => {
+  usersContext += `${i + 1}. ${u.username} (${u.role})\n`;
+});
+
+// FINAL PROMPT 
+let finalPrompt = `
+You are an intelligent AI inside company dashboard.
+
+RULES:
+- Give clear smart answers
+- Be accurate
+- Avoid long unnecessary text
+- Be professional
 
 User: ${req.user.username}
 Role: ${req.user.role}
 
 DATABASE:
 ${context}
+`;
 
-User Question:
+if (fileText) {
+  finalPrompt += `
+FILE CONTENT:
+${fileText}
+
+DATABASE:
+${context}
+
+USER DATABASE:
+${usersContext}
+
+
+TASK:
+Analyze and summarize with insights.
+`;
+}
+
+if (message) {
+  finalPrompt += `
+USER QUESTION:
 ${message}
-`,
+`;
+}
+
+// TEXT AI CALL 
+const ollamaResponse = await fetch(OLLAMA_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    model: TEXT_MODEL,
+    prompt: finalPrompt,
     stream: false,
+    keep_alive: 0,
     options: {
       temperature: 0.1,
-      num_predict: 120,
+      num_predict: 150,
+      num_ctx: 2048,
     },
   }),
 });
@@ -277,18 +281,17 @@ return res.status(500).json({ message: "AI request failed" });
 }
 };
 
-// WELCOME MESSAGE
-
+// WELCOME 
 export const getWelcomeMessage = async (req: AuthRequest, res: Response) => {
 try {
-if (!req.user) {
-  return res.status(401).json({ message: "Unauthorized" });
-}
+if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
 return res.json({
-  reply: `Welcome ${req.user.username} 👋 Ask me about projects or users.`,
+  reply: `Welcome ${req.user.username} 👋
+Upload PDF, image, audio or video and ask anything.`,
 });
 } catch {
-return res.status(500).json({ message: "Failed to load welcome" });
+return res.status(500).json({ message: "Failed" });
 }
 };
+
