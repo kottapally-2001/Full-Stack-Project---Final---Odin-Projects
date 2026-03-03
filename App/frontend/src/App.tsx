@@ -27,6 +27,19 @@ const role = localStorage.getItem("role");
 
 const [showAdminInfo, setShowAdminInfo] = useState(false);
 const dropdownRef = useRef<HTMLDivElement>(null);
+const [aiOpen, setAiOpen] = useState(false);
+const [aiMinimized, setAiMinimized] = useState(false);
+const [aiMessages, setAiMessages] = useState<any[]>([]);
+
+useEffect(() => {
+  const close = (e:any)=>{
+    if(e.target.classList.contains("ai-modal-overlay")){
+      setAiOpen(false);
+    }
+  };
+  document.addEventListener("click", close);
+  return ()=> document.removeEventListener("click", close);
+},[]);
 
 /* Close dropdown when clicking outside */
 useEffect(() => {
@@ -55,12 +68,22 @@ return (
   {/* NAVBAR */}
   {token && (
     <nav className="navbar">
-      <div className="logo" onClick={() => navigate("/dashboard")}>
+      <div
+  className="logo"
+  onClick={() => {
+    navigate("/dashboard");
+
+    // 🔻 AUTO MINIMIZE AI
+    if (aiOpen) setAiMinimized(true);
+  }}
+>
         <div className="logo-circle">PM</div>
         <span>Project Management</span>
       </div>
 
       <div className="nav-actions">
+
+      
 
         {/* USER DROPDOWN */}
         <div className="user-wrapper" ref={dropdownRef}>
@@ -68,6 +91,7 @@ return (
             className="logged-user"
             onClick={() => setShowAdminInfo((prev) => !prev)}
           >
+
             👤 {username} ({role})
           </span>
 
@@ -83,25 +107,52 @@ return (
           )}
         </div>
 
+        {/* AI BUTTON WITH MIN/MAX INSIDE */}
+<button
+  className="nav-btn"
+  onClick={() => {
+    if (!aiOpen) {
+      setAiOpen(true);          // first open
+      setAiMinimized(false);
+    } else if (aiMinimized) {
+      setAiMinimized(false);    // restore
+    } else {
+      setAiMinimized(true);     // minimize
+    }
+  }}
+>
+  🤖 AI {aiOpen ? (aiMinimized ? "🗖" : "➖") : ""}
+</button>
         <button
-          className="nav-btn"
-          onClick={() => navigate("/projects")}
-        >
-          Projects 📁
-        </button>
+  className="nav-btn"
+  onClick={() => {
+    navigate("/projects");
+
+    // 🔻 AUTO MINIMIZE AI
+    if (aiOpen) setAiMinimized(true);
+  }}
+>
+  Projects 📁
+</button>
 
         {role === "admin" && (
           <>
             <button
               className="nav-btn"
-              onClick={() => navigate("/projects/new")}
+              onClick={() => {
+  navigate("/projects/new");
+  if (aiOpen) setAiMinimized(true);
+}}
             >
               ➕ Add Project
             </button>
 
             <button
               className="nav-btn"
-              onClick={() => navigate("/users")}
+              onClick={() => {
+  navigate("/users");
+  if (aiOpen) setAiMinimized(true);
+}}
             >
               Users 👥
             </button>
@@ -198,10 +249,19 @@ return (
 
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
-
-  {/* FLOATING AI */}
-  {token && <AiChat />}
-
+{/* AI CHAT WINDOW */}
+{token && aiOpen && !aiMinimized && (
+  <div className="ai-modal-overlay">
+    <div className="ai-modal">
+      <AiChat
+        onClose={() => setAiMinimized(true)}   // minimize only
+        messages={aiMessages}
+        setMessages={setAiMessages}
+        autoMinimize={() => setAiMinimized(true)}
+      />
+    </div>
+  </div>
+)}
 </div>
 );
 };
